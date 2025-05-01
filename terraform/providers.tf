@@ -26,4 +26,7 @@ provider "snowflake" {
   # Credenciales obtenidas de variables de entorno (SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, etc.)
   # La región se especifica vía variable por claridad si se necesita en otro lugar
   # role = var.snowflake_role # A menudo también se establece vía variable de entorno
+  preview_features_enabled = [
+      "snowflake_storage_integration_resource"
+  ]
 }
