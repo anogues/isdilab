@@ -17,29 +17,26 @@ resource "aws_s3_bucket" "data_bucket" {
   }
 }
 
-# Rol IAM para la Integración de Snowflake
-data "aws_caller_identity" "current" {}
-
 resource "aws_iam_role" "snowflake_access_role" {
   name = "snowflake-lab-access-role-${random_string.bucket_suffix.result}"
 
+  # The assume_role_policy will be updated by Terraform on the second apply.
+  # It references attributes from the snowflake_storage_integration resource.
+  # These attributes are only known *after* the integration is created (Apply 1).
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
         Principal = {
-          # Este ARN será completado por Snowflake después de crear la integración.
-          # Usamos un valor temporal o el ARN de la cuenta para el plan inicial.
-          # El data source `snowflake_system_get_aws_s3_integration_iam_user_arn` lo obtendrá después.
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" # Placeholder inicial
+          # Use the ARN provided by the Snowflake integration resource after creation
+          AWS = snowflake_storage_integration.s3_integration.storage_aws_iam_user_arn
         }
         Action = "sts:AssumeRole"
         Condition = {
            StringEquals = {
-              # Este External ID será completado por Snowflake después.
-              # Usamos un placeholder temporal. El data source `snowflake_storage_integration` lo proporcionará.
-              "sts:ExternalId" = "PLACEHOLDER_EXTERNAL_ID" # Placeholder inicial
+              # Use the External ID provided by the Snowflake integration resource after creation
+              "sts:ExternalId" = snowflake_storage_integration.s3_integration.storage_aws_external_id
            }
         }
       }
@@ -51,10 +48,10 @@ resource "aws_iam_role" "snowflake_access_role" {
     Environment = "Lab"
     ManagedBy   = "Terraform"
   }
-  # Ignoramos cambios en assume_role_policy porque lo actualizaremos explícitamente
-  lifecycle {
-     ignore_changes = [assume_role_policy]
-   }
+
+  # This role depends on the storage integration being created first,
+  # so that the storage_aws_iam_user_arn and storage_aws_external_id are available.
+  depends_on = [snowflake_storage_integration.s3_integration]
 }
 
 resource "aws_iam_policy" "snowflake_access_policy" {
@@ -104,60 +101,28 @@ resource "snowflake_schema" "bronze_schema" {
   comment  = "Esquema de datos crudos para el lab dbt, gestionado por Terraform"
 }
 
+# Create the Storage Integration
+# This resource provides 'storage_aws_iam_user_arn' and 'storage_aws_external_id'
+# outputs AFTER it is successfully created by Snowflake via the provider.
 resource "snowflake_storage_integration" "s3_integration" {
   name = upper(var.snowflake_integration_name)
-  type = "EXTERNAL_STAGE" # Indica que es para stages S3
+  type = "EXTERNAL_STAGE" # Indicates this is for S3 stages
   storage_provider = "S3"
   enabled = true
-  storage_aws_role_arn = aws_iam_role.snowflake_access_role.arn
-  storage_allowed_locations = ["s3://${aws_s3_bucket.data_bucket.bucket}/"] # Restringir a nuestro bucket
-  comment = "Integración S3 para el lab dbt"
+  storage_aws_role_arn = aws_iam_role.snowflake_access_role.arn # Reference the role ARN
+  storage_allowed_locations = ["s3://${aws_s3_bucket.data_bucket.bucket}/"] # Restrict to our bucket
+  comment = "S3 Integration for dbt lab"
+
+  # IMPORTANT: storage_aws_role_arn must reference an EXISTING role when Snowflake creates
+  # the integration. However, the role's trust policy needs values FROM the integration.
+  # This creates a cycle that requires two applies.
+  # Apply 1: Creates role (with potentially incomplete/placeholder trust policy initially if values not known), creates integration referencing role ARN. Snowflake populates ARN/ExternalID.
+  # Apply 2: Terraform detects change in role's assume_role_policy based on populated values from integration, updates the role.
 }
 
 # Actualizar la política de confianza del rol IAM DESPUÉS de que la integración Snowflake se haya creado
 # Esto requiere que la integración exista primero para obtener los valores correctos.
 # Ejecutar `terraform apply` dos veces podría ser necesario.
-
-# Obtenemos el usuario IAM y el ID externo DESPUÉS de crear la integración
-data "snowflake_storage_integration" "s3_integration_data" {
-  name = snowflake_storage_integration.s3_integration.name
-  depends_on = [snowflake_storage_integration.s3_integration]
-}
-
-
-resource "aws_iam_role" "snowflake_access_role_update" {
-  # Usa el *mismo* nombre para actualizar el rol existente
-  name = aws_iam_role.snowflake_access_role.name
-
-  # Define la política de confianza actualizada usando datos obtenidos de Snowflake
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          AWS = data.snowflake_storage_integration.s3_integration_data.storage_aws_iam_user_arn # Obtenido de Snowflake
-        }
-        Action = "sts:AssumeRole"
-        Condition = {
-          StringEquals = {
-            # Usa el ID Externo proporcionado por Snowflake para esta integración
-            "sts:ExternalId" = data.snowflake_storage_integration.s3_integration_data.storage_aws_external_id # Obtenido de Snowflake
-          }
-        }
-      }
-    ]
-  })
-
-  # Asegura que esta actualización ocurra solo después de que la integración sea creada
-  depends_on = [snowflake_storage_integration.s3_integration]
-
-  # Ignora cambios en otros atributos, solo actualiza la política
-   lifecycle {
-     ignore_changes = [tags, description, force_detach_policies, inline_policy, managed_policy_arns, max_session_duration, path, permissions_boundary, name]
-   }
-}
-
 
 resource "snowflake_stage" "s3_stage" {
   name     = upper(var.snowflake_stage_name)
@@ -172,7 +137,7 @@ resource "snowflake_stage" "s3_stage" {
   # Para PARQUET: file_format = "TYPE = PARQUET"
 
   depends_on = [
-     aws_iam_role.snowflake_access_role_update, # Asegura que la política del rol esté actualizada antes de que el stage use la integración
+     aws_iam_role.snowflake_access_role, # Asegura que la política del rol esté actualizada antes de que el stage use la integración
      snowflake_storage_integration.s3_integration
   ]
 }
