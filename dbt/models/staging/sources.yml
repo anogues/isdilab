@@ -1,0 +1,17 @@
+version: 2
+sources:
+  - name: raw_customer_data
+    database: LAB_DB
+    schema: bronze      # <- Origen es bronze
+    loader: external
+    external:
+      location: "@S3_CUSTOMER_STAGE" # Stage dentro de 'bronze'
+      file_format: "(TYPE = CSV FIELD_DELIMITER = ',' SKIP_HEADER = 1 EMPTY_FIELD_AS_NULL = TRUE)"
+    tables:
+      - name: customers_external
+        description: "Tabla externa apuntando a CSVs en stage S3 (schema bronze)"
+        columns:
+          - { name: customer_id, description: "ID Cliente", data_type: NUMBER, quote: false }
+          - { name: first_name, description: "Nombre", data_type: VARCHAR }
+          - { name: last_name, description: "Apellido", data_type: VARCHAR }
+          - { name: join_date, description: "Fecha unión", data_type: DATE }
