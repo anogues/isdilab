@@ -119,8 +119,7 @@ resource "aws_iam_role" "snowflake_access_role_policy_update" {
   # Dependencia explícita
   depends_on = [snowflake_storage_integration.s3_integration]
 
-  # Ignorar TODO excepto la política de confianza. Incluimos explícitamente el nombre,
-  # aunque es el identificador, para reforzar que este bloque no lo gestiona.
+  # Ignorar TODO excepto la política de confianza.
   lifecycle {
     ignore_changes = [
       name, # Ignorar explícitamente el nombre
@@ -132,7 +131,7 @@ resource "aws_iam_role" "snowflake_access_role_policy_update" {
       max_session_duration,
       path,
       permissions_boundary,
-      role_last_used, # Atributo de solo lectura que a veces causa ruido
+      # role_last_used, <--- LÍNEA ELIMINADA
     ]
   }
 }
