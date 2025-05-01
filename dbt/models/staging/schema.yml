@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Tabla staging para datos de clientes (en BRONZE_RAW_STAGING). Contiene una fila por cliente."
+    columns:
+      - name: customer_id
+        description: "Identificador único para el cliente."
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: "Nombre del cliente."
+        tests:
+          - not_null
+      - name: last_name
+        description: "Apellido del cliente."
+      - name: join_date
+        description: "Fecha en que el cliente se unió."
+        tests:
+          - not_null
