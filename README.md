@@ -1,6 +1,11 @@
 ## Laboratorio Guiado: Construyendo una Arquitectura de Datos Simple con Terraform, AWS, Snowflake y dbt Cloud (Versión Final v2)
 
 **Objetivo:** Construir un pipeline de datos que use Terraform para aprovisionar infraestructura fuente (bucket S3, Stage Snowflake en schema `bronze`), cargue datos de muestra, y use dbt Cloud para crear una tabla externa, transformar los datos y materializarlos en esquemas específicos (`BRONZE_RAW_STAGING`, `BRONZE_ANALYTICS`). Esta versión incluye un paso manual necesario para la configuración IAM.
+<<<<<<< HEAD
+=======
+
+**Presupuesto:** < $10 (Objetivo cercano a $0 con niveles gratuitos y limpieza rápida)
+>>>>>>> a510b699ded02db1ab811f1e3b236f575b406d9b
 
 **Tecnologías Principales:**
 *   AWS (S3) - Elegible para el Nivel Gratuito de almacenamiento
@@ -534,6 +539,7 @@ customer_id,first_name,last_name,join_date
     ```
 
 6.  **Tests (`models/staging/schema.yml`, `models/marts/schema.yml`):** (Define tests para `stg_customers` y `dim_customers`).
+<<<<<<< HEAD
     ```yaml
     # models/staging/schema.yml
     version: 2; models: [{ name: stg_customers, description: "Tabla staging clientes en BRONZE_RAW_STAGING.", columns: [{name: customer_id, tests: [unique, not_null]}, {name: first_name, tests: [not_null]}, {name: last_name}, {name: join_date, tests: [not_null]}]}]
@@ -541,6 +547,58 @@ customer_id,first_name,last_name,join_date
     ```yaml
     # models/marts/schema.yml
     version: 2; models: [{ name: dim_customers, description: "Vista dimensión clientes en BRONZE_ANALYTICS.", columns: [{name: customer_id, tests: [unique, not_null, relationships: {to: ref('stg_customers'), field: customer_id}]}, {name: first_name}, {name: last_name}, {name: join_date}, {name: join_year}]}]
+=======
+*   **Tests Staging (`models/staging/schema.yml`):**
+    ```yaml
+    version: 2
+
+    models:
+      - name: stg_customers
+        description: "Tabla staging para datos de clientes (en BRONZE_RAW_STAGING). Contiene una fila por cliente."
+        columns:
+          - name: customer_id
+            description: "Identificador único para el cliente."
+            tests:
+              - unique
+              - not_null
+          - name: first_name
+            description: "Nombre del cliente."
+            tests:
+              - not_null
+          - name: last_name
+            description: "Apellido del cliente."
+          - name: join_date
+            description: "Fecha en que el cliente se unió."
+            tests:
+              - not_null
+    ```
+
+
+*   **Tests Marts (`models/marts/schema.yml`):**
+    ```yaml
+    version: 2
+
+    models:
+      - name: dim_customers
+        description: "Vista de dimensión de cliente (en BRONZE_ANALYTICS), proveyendo atributos de cliente limpios."
+        columns:
+          - name: customer_id
+            description: "Identificador único para el cliente."
+            tests:
+              - unique
+              - not_null
+              - relationships:
+                  to: ref('stg_customers') # Verifica que existe en la tabla staging
+                  field: customer_id
+          - name: first_name
+            description: "Nombre del cliente."
+          - name: last_name
+            description: "Apellido del cliente."
+          - name: join_date
+            description: "Fecha en que el cliente se unió."
+          - name: join_year
+            description: "Año en que el cliente se unió (calculado)."
+>>>>>>> a510b699ded02db1ab811f1e3b236f575b406d9b
     ```
 
 7.  **Commit y Push del código dbt.**
