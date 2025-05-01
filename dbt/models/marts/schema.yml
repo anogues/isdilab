@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Vista de dimensión de cliente (en BRONZE_ANALYTICS), proveyendo atributos de cliente limpios."
+    columns:
+      - name: customer_id
+        description: "Identificador único para el cliente."
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_customers') # Verifica que existe en la tabla staging
+              field: customer_id
+      - name: first_name
+        description: "Nombre del cliente."
+      - name: last_name
+        description: "Apellido del cliente."
+      - name: join_date
+        description: "Fecha en que el cliente se unió."
+      - name: join_year
+        description: "Año en que el cliente se unió (calculado)."
