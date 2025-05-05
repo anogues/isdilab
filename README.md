@@ -2,8 +2,6 @@
 
 **Objetivo:** Construir un pipeline de datos que use Terraform para aprovisionar infraestructura fuente (bucket S3, Stage Snowflake en schema `bronze`), cargue datos de muestra, y use dbt Cloud para crear una tabla externa, transformar los datos y materializarlos en esquemas específicos (`BRONZE_RAW_STAGING`, `BRONZE_ANALYTICS`). Esta versión incluye un paso manual necesario para la configuración IAM.
 
-**Presupuesto:** < $10 (Objetivo cercano a $0 con niveles gratuitos y limpieza rápida)
-
 **Tecnologías Principales:**
 *   AWS (S3) - Elegible para el Nivel Gratuito de almacenamiento
 *   Snowflake - Prueba Gratuita (30 días, $400 en créditos)
@@ -19,10 +17,10 @@
 Antes de comenzar el laboratorio, los estudiantes **DEBEN**:
 
 1.  **Crear una Cuenta de AWS:** [aws.amazon.com](https://aws.amazon.com/). Necesitarás la capacidad de crear usuarios/roles IAM y buckets S3. **Importante:** Anota tu **ID de Cuenta de AWS** (número de 12 dígitos). Lo necesitarás para la política IAM personalizada.
-2.  **Crear una Cuenta de Snowflake:** [signup.snowflake.com](https://signup.snowflake.com/). Elige la edición Standard en AWS en una región conveniente para ti (ej., `eu-west-1`). Anota tu **Nombre de Organización** y **Nombre de Cuenta** (los encontrarás en la URL de activación o de login, ej: `nombreorg-nombrecuenta.snowflakecomputing.com`).
+2.  **Crear una Cuenta de Snowflake:** [signup.snowflake.com](https://signup.snowflake.com/). Elige la edición Standard en AWS en una región conveniente para ti (ej., `AWS_EU_WEST_1`). Anota tu **Nombre de Organización** y **Nombre de Cuenta** (los encontrarás en la URL de activación o de login, ej: `nombreorg-nombrecuenta.snowflakecomputing.com`).
 3.  **Crear una Cuenta de Terraform Cloud:** [app.terraform.io/signup](https://app.terraform.io/signup). Crea una organización.
 4.  **Crear una Cuenta de dbt Cloud:** [cloud.getdbt.com/signup](https://cloud.getdbt.com/signup/). Elige el plan Developer (Gratuito).
-5.  **Crear un Repositorio Git:** En GitHub, GitLab, Bitbucket o Azure DevOps. Alojará tu código Terraform y dbt. Inicialízalo con un `README.md`.
+5.  **Crear un Repositorio Git:** En GitHub, GitLab, Bitbucket o Azure DevOps. Alojará tu código Terraform y dbt. Inicialízalo con un `README.md`. Podéis clonar el mío: https://github.com/anogues/isdilab/
 6.  **Instalar Git:** [git-scm.com/downloads](https://git-scm.com/downloads).
 7.  **(Opcional pero Recomendado):** Instalar AWS CLI ([docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)) para facilitar la carga a S3 más tarde.
 
