@@ -3,7 +3,7 @@ Cambios para eliminar el uso del bucket de S3 y usar un stage interno en snowfla
 1.  **Eliminación de Recursos AWS en Terraform:**
     *   Quitar completamente la definición del bucket S3 (`aws_s3_bucket`).
     *   Quitar todos los recursos relacionados con IAM (`aws_iam_role`, `aws_iam_policy`, `aws_iam_role_policy_attachment`). Ya no necesitas un rol IAM para que Snowflake acceda a S3 porque los datos estarán *dentro* de Snowflake.
-    *   Quitar la definición del proveedor AWS si no se usan otros recursos de AWS en el mismo estado de Terraform (aunque en tu lab original solo usábamos S3).
+    *   Quitar la definición del proveedor AWS si no se usan otros recursos de AWS en el mismo estado de Terraform (aunque en el lab original solo usábamos S3).
 2.  **Eliminación de Credenciales AWS:**
     *   Quitar las variables de entorno de AWS (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) de Terraform Cloud.
     *   Quitar la variable Terraform `aws_region`.
