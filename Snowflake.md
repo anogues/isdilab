@@ -35,3 +35,18 @@ GRANT ROLE TRANSFORMER TO USER DBT_USER;
 GRANT CREATE TABLE ON FUTURE SCHEMAS IN DATABASE LAB_DB TO ROLE TRANSFORMER;
 
 GRANT CREATE VIEW ON FUTURE SCHEMAS IN DATABASE LAB_DB TO ROLE TRANSFORMER;
+
+
+USE DATABASE LAB_DB;
+USE SCHEMA bronze; -- O el schema donde quieras guardar el formato de archivo
+
+CREATE OR REPLACE FILE FORMAT my_csv_format
+  TYPE = CSV
+  FIELD_DELIMITER = ','
+  SKIP_HEADER = 1
+  EMPTY_FIELD_AS_NULL = TRUE
+  -- Añade más opciones si es necesario
+  COMMENT = 'Formato CSV estándar para el lab';
+
+-- Otorgar permiso de uso al rol de dbt
+GRANT USAGE ON FILE FORMAT LAB_DB.bronze.my_csv_format TO ROLE TRANSFORMER;
