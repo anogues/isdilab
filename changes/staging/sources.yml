@@ -1,0 +1,17 @@
+# models/staging/sources.yml
+version: 2
+
+sources:
+  - name: raw_customer_data
+    database: LAB_DB
+    schema: bronze # La tabla externa se creará aquí por dbt-external-tables
+    # loader: S3 # Puedes quitar o cambiar a 'Snowflake Internal' para documentación
+
+    tables:
+      - name: customers_external # Este será el nombre de la Tabla Externa
+        description: "Tabla externa apuntando a CSVs en stage interno Snowflake"
+        external:
+          location: "@LAB_DB.bronze.INTERNAL_CUSTOMER_STAGE" # <- APUNTA AL STAGE INTERNO
+          # El stage interno ya está en LAB_DB.bronze, así que solo @STAGE_NAME
+          file_format: "(TYPE = CSV FIELD_DELIMITER = ',' SKIP_HEADER = 1 EMPTY_FIELD_AS_NULL = TRUE)"
+          # auto_refresh: false # Generalmente no aplica o es diferente para stages internos
