@@ -1,0 +1,11 @@
+version: 2
+
+seeds:
+  - name: customers
+    description: "Datos brutos de clientes cargados via dbt seed (equivalente a BRONZE en la versión Snowflake)."
+    columns:
+      - name: customer_id
+        description: "Identificador del cliente."
+        tests:
+          - not_null
+          - unique

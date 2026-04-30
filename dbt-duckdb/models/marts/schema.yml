@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Tabla de dimensión de cliente (en GOLD), proveyendo atributos de cliente limpios."
+    columns:
+      - name: customer_id
+        description: "Identificador único para el cliente."
+        tests:
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: first_name
+        description: "Nombre del cliente."
+      - name: last_name
+        description: "Apellido del cliente."
+        tests:
+          - not_null
+      - name: join_date
+        description: "Fecha en que el cliente se unió."
+        tests:
+          - not_null
+      - name: join_year
+        description: "Año en que el cliente se unió (calculado)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [2023]

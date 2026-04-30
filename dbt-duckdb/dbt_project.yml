@@ -1,0 +1,25 @@
+name: 'snowflake_lab_project'
+version: '1.0.0'
+config-version: 2
+profile: 'snowflake_lab_project'
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target"]
+
+models:
+  snowflake_lab_project:
+    +materialized: view
+    staging:
+      +materialized: table
+      +schema: SILVER
+    marts:
+      +schema: GOLD
+
+seeds:
+  snowflake_lab_project:
+    +schema: BRONZE
+    +column_types:
+      customer_id: integer

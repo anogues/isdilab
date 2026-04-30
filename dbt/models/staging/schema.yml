@@ -6,15 +6,14 @@ models:
     columns:
       - name: customer_id
         description: "Identificador único para el cliente."
-        tests:
-          - unique
-          - not_null
       - name: first_name
         description: "Nombre del cliente."
         tests:
           - not_null
       - name: last_name
         description: "Apellido del cliente."
+        tests:
+          - not_null
       - name: join_date
         description: "Fecha en que el cliente se unió."
         tests:

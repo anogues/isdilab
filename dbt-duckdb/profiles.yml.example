@@ -1,0 +1,8 @@
+snowflake_lab_project:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: lab.duckdb
+      schema: main
+      threads: 1

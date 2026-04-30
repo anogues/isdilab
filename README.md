@@ -2,11 +2,13 @@
 
 **Objetivo:** Cargar un CSV en Snowflake y transformarlo con dbt Cloud hasta obtener un modelo analítico validado con tests.
 
+> ¿No tienes Snowflake? Usa la versión **100% gratuita** con DuckDB: consulta la sección [Opcional: Ejecutar localmente con dbt Core](#opcional-ejecutar-localmente-con-dbt-core).
+
 ## Resumen del Proyecto
 
 Este laboratorio implementa un pipeline completo de transformación de datos siguiendo la arquitectura medallion (BRONZE-SILVER-GOLD):
 
-1. **Ingesta de datos (BRONZE):** Carga manual de un archivo CSV (`customers.csv`) con 5 registros de clientes directamente en Snowflake
+1. **Ingesta de datos (BRONZE):** Carga manual de un archivo CSV (`customers.csv`) con 7 registros de clientes (2 con errores intencionados) directamente en Snowflake
 2. **Transformación staging (SILVER):** Limpieza y tipado explícito de datos crudos, convirtiendo tipos de datos y parseando fechas de forma segura
 3. **Modelado analítico (GOLD):** Creación de una dimensión de clientes (`dim_customers`) con atributos derivados para análisis
 
@@ -52,6 +54,7 @@ GRANT USAGE ON WAREHOUSE DBT_LAB_WH TO ROLE TRANSFORMER; -- Ejecutar queries
 GRANT USAGE ON DATABASE LAB_DB TO ROLE TRANSFORMER; -- Acceso a la DB
 GRANT USAGE ON SCHEMA LAB_DB.BRONZE TO ROLE TRANSFORMER; -- Leer fuente BRONZE
 GRANT CREATE SCHEMA ON DATABASE LAB_DB TO ROLE TRANSFORMER; -- Crear SILVER y GOLD
+GRANT USAGE ON FUTURE SCHEMAS IN DATABASE LAB_DB TO ROLE TRANSFORMER; -- Acceso automático a nuevos schemas
 GRANT CREATE TABLE ON FUTURE SCHEMAS IN DATABASE LAB_DB TO ROLE TRANSFORMER; -- Materialización table
 GRANT CREATE VIEW ON FUTURE SCHEMAS IN DATABASE LAB_DB TO ROLE TRANSFORMER; -- Materialización view
 
@@ -72,10 +75,10 @@ GRANT ROLE TRANSFORMER TO USER DBT_USER; -- Vincular usuario técnico de dbt
 3. Verifica:
 
 ```sql
-SELECT * FROM LAB_DB.BRONZE.CUSTOMERS_RAW LIMIT 5;
+SELECT * FROM LAB_DB.BRONZE.CUSTOMERS_RAW LIMIT 7;
 ```
 
-Debes ver 5 filas.
+Debes ver 7 filas.
 
 ## Parte 3: Configurar dbt Cloud
 
@@ -93,120 +96,39 @@ Debes ver 5 filas.
 
 ## Parte 4: Ajustar el proyecto dbt (sin paquetes externos)
 
-### `dbt_project.yml`
+El proyecto ya incluye todos los archivos necesarios en `dbt/`. Revísalos para entender el diseño:
 
-Mantén esta configuración de modelos:
+| Archivo | Función |
+|---|---|
+| `dbt/dbt_project.yml` | Configura staging como `table` en SILVER y marts en GOLD |
+| `dbt/models/staging/sources.yml` | Fuente BRONZE (`LAB_DB.BRONZE.CUSTOMERS_RAW`) con tests de calidad |
+| `dbt/models/staging/schema.yml` | Tests en capa SILVER |
+| `dbt/models/staging/stg_customers.sql` | Tipado explícito y parseo seguro de fechas → SILVER |
+| `dbt/models/marts/schema.yml` | Tests en capa GOLD |
+| `dbt/models/marts/dim_customers.sql` | Dimensión analítica con `join_year` → GOLD |
 
-```yaml
-models:
-  snowflake_lab_project: # Debe coincidir con el name de tu proyecto dbt
-    +materialized: view
-    staging:
-      +materialized: table # Staging como tabla física
-      +schema: SILVER # LAB_DB.SILVER
-    marts:
-      +schema: GOLD # LAB_DB.GOLD
-```
+**Tests de calidad incluidos en el proyecto:**
 
-### `models/staging/sources.yml`
+Capa BRONZE (`sources.yml`):
+- `not_null` en `customer_id`: evita filas sin clave de cliente en el origen.
+- `unique` en `customer_id`: detecta duplicados en la ingesta inicial.
 
-Usa la tabla cargada en Snowflake como source:
+Capa SILVER (`staging/schema.yml`):
+- `not_null` en `first_name` y `last_name`: asegura nombres y apellidos completos.
+- `not_null` en `join_date`: valida que el parseo de fecha no falló.
 
-```yaml
-version: 2
+Capa GOLD (`marts/schema.yml`):
+- `relationships` en `customer_id` → `stg_customers`: asegura integridad referencial entre capas.
+- `not_null` en `last_name`: asegura que la dimensión mantiene apellidos completos.
+- `not_null` en `join_date`: confirma que la fecha llegó íntegra desde staging.
+- `not_null` en `join_year`: valida que el cálculo del año derivado es correcto.
+- `accepted_values` en `join_year`: limita valores a `[2023]` y detecta fechas anómalas.
 
-sources:
-  - name: raw_customer_data
-    database: LAB_DB # Base de datos origen en Snowflake
-    schema: BRONZE # Schema origen
-    tables:
-      - name: CUSTOMERS_RAW # Tabla cargada manualmente desde customers.csv
-        columns:
-          - name: customer_id
-            description: "Identificador del cliente en BRONZE."
-            tests:
-              - not_null
-              - unique
-```
+> **Nota:** El `name` en `dbt_project.yml` debe coincidir con el nombre del proyecto en dbt Cloud (`snowflake_lab_project` por defecto).
 
-Función de estos checks en BRONZE:
+## Parte 5: Ejecutar, depurar y validar
 
-- `not_null`: evita filas sin clave de cliente en la capa de origen.
-- `unique`: detecta duplicados de `customer_id` en la ingesta inicial.
-
-### `models/staging/stg_customers.sql`
-
-```sql
-with source as (
-  select
-    customer_id::number as customer_id, -- Tipado explícito
-    first_name::varchar as first_name,
-    last_name::varchar as last_name,
-    try_to_date(join_date::varchar, 'YYYY-MM-DD') as join_date -- Parse seguro de fecha
-  from {{ source('raw_customer_data', 'CUSTOMERS_RAW') }} -- LAB_DB.BRONZE.CUSTOMERS_RAW
-)
-
-select
-  customer_id,
-  first_name,
-  last_name,
-  join_date
-from source
-```
-
-### `models/marts/dim_customers.sql`
-
-```sql
-{{ config(materialized='table') }}
-
-with customers as (
-  select
-    customer_id,
-    first_name,
-    last_name,
-    join_date
-  from {{ ref('stg_customers') }} -- Referencia al modelo staging
-)
-
-select
-  customer_id,
-  first_name,
-  last_name,
-  join_date,
-  year(join_date) as join_year -- Atributo derivado para analítica
-from customers
-```
-
-### `models/marts/schema.yml` (tests adicionales)
-
-```yaml
-version: 2
-
-models:
-  - name: dim_customers
-    columns:
-      - name: customer_id
-        tests:
-          - unique
-          - not_null
-      - name: join_date
-        tests:
-          - not_null
-      - name: join_year
-        tests:
-          - not_null
-          - accepted_values:
-              values: [2023]
-```
-
-Función de estos checks en GOLD:
-
-- `not_null` en `customer_id`: asegura que la dimensión tiene claves válidas.
-- `not_null` en `join_date`: valida que el parseo de fecha no falló en staging.
-- `not_null` en `join_year`: asegura que el cálculo del año es correcto.
-- `accepted_values` en `join_year`: limita valores al año real de los datos (2023) y detecta fechas corruptas/anómalas.
-
-## Parte 5: Ejecutar y validar
+### 5.1 Ejecuta `dbt build`
 
 En la terminal de dbt Cloud:
 
@@ -214,16 +136,166 @@ En la terminal de dbt Cloud:
 dbt build
 ```
 
-Verifica en Snowflake:
+El build **fallará intencionadamente**. Esto es parte del laboratorio — verás errores como:
 
-```sql
-SELECT * FROM LAB_DB.SILVER.STG_CUSTOMERS LIMIT 5;
-SELECT * FROM LAB_DB.GOLD.DIM_CUSTOMERS LIMIT 5;
+```
+FAIL: 1   unique source_raw_customer_data_CUSTOMERS_RAW_customer_id
+FAIL: 1   not_null stg_customers_last_name
+FAIL: 1   not_null dim_customers_last_name
 ```
 
-Si ambos `SELECT` devuelven 5 filas y `dbt build` termina sin errores, el laboratorio está correcto.
+### 5.2 Diagnostica y corrige los datos
+
+Los tests te están diciendo qué está mal:
+
+| Error | Causa | Solución (`LAB_DB.BRONZE.CUSTOMERS_RAW`) |
+|---|---|---|
+| `unique` en `customer_id` | Hay dos filas con `customer_id = 3` | `DELETE FROM LAB_DB.BRONZE.CUSTOMERS_RAW WHERE customer_id = 3 AND last_name = 'Dupont';` |
+| `not_null` en `last_name` | Frank no tiene apellido | `UPDATE LAB_DB.BRONZE.CUSTOMERS_RAW SET last_name = 'Miller' WHERE customer_id = 6;` |
+
+Ejecuta esos comandos en Snowsight (rol `ACCOUNTADMIN`) y luego verifica:
+
+```sql
+SELECT * FROM LAB_DB.BRONZE.CUSTOMERS_RAW;
+```
+
+Debes ver 7 filas, cada una con `customer_id` único y `last_name` no vacío.
+
+### 5.3 Re-ejecuta y valida
+
+```bash
+dbt build
+```
+
+Ahora todo debe salir en verde. Verifica los resultados en Snowflake:
+
+```sql
+SELECT * FROM LAB_DB.SILVER.STG_CUSTOMERS LIMIT 7;
+SELECT * FROM LAB_DB.GOLD.DIM_CUSTOMERS LIMIT 7;
+```
+
+### 5.4 Genera la documentación
+
+```bash
+dbt docs generate
+dbt docs serve
+```
+
+Explora el grafo de linaje y la documentación generada de los modelos.
+
+## Opcional: Ejecutar localmente con dbt Core
+
+Si prefieres dbt Core a dbt Cloud, tienes dos caminos:
+
+### Opción A: dbt Core + Snowflake (requiere cuenta Snowflake)
+
+1. Instala dbt Core y el adaptador de Snowflake:
+   ```bash
+   pip install dbt-core dbt-snowflake
+   ```
+
+2. Clona el repositorio y ve al directorio del proyecto:
+   ```bash
+   cd isdilab/dbt
+   ```
+
+3. Copia la plantilla de conexión al directorio `.dbt` y configura las variables de entorno:
+
+   ```bash
+   # macOS / Linux
+   mkdir -p ~/.dbt
+   cp profiles.yml.example ~/.dbt/profiles.yml
+   export SNOWFLAKE_ACCOUNT="mi_org-mi_cuenta"
+   export SNOWFLAKE_PASSWORD="mi_password"
+   ```
+
+   ```powershell
+   # Windows (PowerShell)
+   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.dbt"
+   Copy-Item profiles.yml.example "$env:USERPROFILE\.dbt\profiles.yml"
+   $env:SNOWFLAKE_ACCOUNT = "mi_org-mi_cuenta"
+   $env:SNOWFLAKE_PASSWORD = "mi_password"
+   ```
+
+4. Verifica y ejecuta:
+   ```bash
+   dbt debug
+   dbt deps
+   dbt build
+   dbt docs generate && dbt docs serve
+   ```
+
+> **Nota:** Debes ejecutar igualmente el script SQL de la Parte 1 en Snowflake y cargar el CSV siguiendo la Parte 2.
+
+### Opción B: dbt Core + DuckDB (100% gratuito, sin cuenta)
+
+DuckDB es una base de datos OLAP local que reemplaza a Snowflake sin coste alguno.
+
+**Cambios respecto a la versión Snowflake:**
+
+| Aspecto | Snowflake (`dbt/`) | DuckDB (`dbt-duckdb/`) |
+|---|---|---|
+| Base de datos | Cloud (cuenta paga) | Archivo local `lab.duckdb` (gratis) |
+| Ingesta | Carga manual CSV en Snowsight | `dbt seed` carga el CSV automáticamente |
+| Capa BRONZE | Tabla `CUSTOMERS_RAW` en Snowflake | Tabla `customers` generada desde seed |
+| Staging | `source()` apunta a tabla Snowflake | `ref()` apunta al seed |
+| SQL | `::number`, `try_to_date()` | `::integer`, `try_strptime()` |
+
+**Pasos:**
+
+1. Instala dbt Core y el adaptador de DuckDB:
+   ```bash
+   pip install dbt-core dbt-duckdb
+   ```
+
+2. Ve al directorio del proyecto DuckDB:
+   ```bash
+   cd isdilab/dbt-duckdb
+   ```
+
+3. Copia la plantilla de conexión al directorio `.dbt`:
+
+   ```bash
+   # macOS / Linux
+   mkdir -p ~/.dbt
+   cp profiles.yml.example ~/.dbt/profiles.yml
+   ```
+
+   ```powershell
+   # Windows (PowerShell)
+   New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.dbt"
+   Copy-Item profiles.yml.example "$env:USERPROFILE\.dbt\profiles.yml"
+   ```
+
+   El perfil no necesita credenciales — DuckDB es una base de datos embebida en un archivo local (`lab.duckdb`).
+
+4. Ejecuta el pipeline:
+   ```bash
+   dbt seed     # Carga customers.csv en BRONZE (equivalente a Partes 1 y 2)
+   dbt build    # Construye SILVER y GOLD + ejecuta tests
+   ```
+
+   `dbt seed` lee los archivos CSV de la carpeta `seeds/` y los materializa como tablas en la base de datos. Es la forma más simple de ingestar datos estáticos en dbt — ideal para archivos de referencia, tablas de lookup o, como en este caso, datasets pequeños de laboratorio. Sustituye por completo los pasos manuales de carga de las Partes 1 y 2.
+
+   El build **fallará intencionadamente** — el CSV tiene dos errores para que aprendas a depurar:
+
+   | Error | Causa | Solución |
+   |---|---|---|
+   | `unique` en `customer_id` | Dos filas comparten `customer_id = 3` | Elimina la fila de Charlie Dupont en `seeds/customers.csv` |
+   | `not_null` en `last_name` | Frank no tiene apellido | Cambia `6,Frank,,2023-04-01` por `6,Frank,Miller,2023-04-01` |
+
+   Corrige el CSV, re-ejecuta `dbt seed` y luego `dbt build` — ahora todo debe salir en verde.
+
+5. Genera la documentación:
+   ```bash
+   dbt docs generate && dbt docs serve
+   ```
+
+El flujo es idéntico al de Snowflake (misma arquitectura medallion, mismos tests, misma salida). Solo cambia cómo se ingieren los datos y dos detalles de sintaxis SQL.
 
 ## Limpieza (opcional)
+
+### Snowflake
 
 ```sql
 USE ROLE ACCOUNTADMIN;
@@ -231,4 +303,10 @@ DROP DATABASE IF EXISTS LAB_DB;
 DROP WAREHOUSE IF EXISTS DBT_LAB_WH;
 DROP USER IF EXISTS DBT_USER;
 DROP ROLE IF EXISTS TRANSFORMER;
+```
+
+### DuckDB
+
+```bash
+rm lab.duckdb
 ```
