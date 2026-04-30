@@ -1,39 +1,16 @@
 version: 2
 
 sources:
-  - name: raw_customer_data # Nombre arbitrario para el grupo de fuentes
-    database: LAB_DB        # DB donde reside el schema/stage
-    schema: bronze           # Schema donde reside el stage
-    loader: S3               # Indicador del cargador (más descriptivo que 'external')
-                             # O puedes omitir 'loader' si defines 'external' abajo
+  - name: raw_customer_data # Grupo lógico de fuentes
+    database: LAB_DB        # Base de datos origen en Snowflake
+    schema: BRONZE          # Schema origen
 
     tables:
-      - name: customers_external # Nombre arbitrario para esta fuente externa específica
-        description: "Representa archivos CSV de clientes en el stage S3 (schema bronze)"
-
-        # Propiedades externas AHORA anidadas bajo la tabla
-        external:
-          location: "@S3_CUSTOMER_STAGE" # Stage object en Snowflake (relativo a LAB_DB.bronze)
-          file_format: "(TYPE = CSV FIELD_DELIMITER = ',' SKIP_HEADER = 1 EMPTY_FIELD_AS_NULL = TRUE)"
-          # auto_refresh: false # (Opcional)
-          # pattern: ".*[.]csv" # (Opcional, si quieres filtrar archivos en el stage)
-
-        # Definición de columnas (igual que antes)
+      - name: CUSTOMERS_RAW # Tabla bronza cargada desde customers.csv
+        description: "Tabla fuente de clientes en LAB_DB.BRONZE.CUSTOMERS_RAW."
         columns:
           - name: customer_id
-            description: "ID Cliente (desde $1)"
-            data_type: NUMBER # dbt no usa data_type aquí para consulta, pero es bueno documentarlo
-          - name: first_name
-            description: "Nombre (desde $2)"
-            data_type: VARCHAR
-          - name: last_name
-            description: "Apellido (desde $3)"
-            data_type: VARCHAR
-          - name: join_date
-            description: "Fecha unión (desde $4)"
-            data_type: DATE
-
-        # ¡Importante! Al consultar columnas posicionales ($1, $2..)
-        # dbt no puede "validar" los nombres de columna aquí contra el stage.
-        # La definición de 'columns' sirve principalmente para documentación y linaje.
-        # El casting real y la selección ocurren en tu modelo .sql (stg_customers.sql).
+            description: "Identificador del cliente en la capa BRONZE."
+            tests:
+              - not_null
+              - unique

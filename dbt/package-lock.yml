@@ -1,5 +1,2 @@
-packages:
-  - name: dbt_external_tables
-    package: dbt-labs/dbt_external_tables
-    version: 0.11.1
-sha1_hash: 8ebd9cc033447f40dc39aff38d75f69f380e8000
+packages: []
+sha1_hash: 87ec402b56989b21f0f0744f4320f4b1648146f4

@@ -15,6 +15,6 @@ models:
     +materialized: view
     staging:
       +materialized: table
-      +schema: RAW_STAGING # Destino para staging
+      +schema: SILVER # Capa medallion intermedia
     marts:
-      +schema: ANALYTICS # Destino para marts
+      +schema: GOLD # Capa medallion de consumo

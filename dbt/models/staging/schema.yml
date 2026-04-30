@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: stg_customers
-    description: "Tabla staging para datos de clientes (en BRONZE_RAW_STAGING). Contiene una fila por cliente."
+    description: "Tabla staging para datos de clientes (en SILVER). Contiene una fila por cliente."
     columns:
       - name: customer_id
         description: "Identificador único para el cliente."
