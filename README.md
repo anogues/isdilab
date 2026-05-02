@@ -423,7 +423,9 @@ El pipeline final queda:
 
 ```
 LAB_DB.BRONZE.CUSTOMERS_RAW ──► stg_customers ──► dim_customers
-                             ──► stg_orders    ──► fact_orders (join con dim_customers)
+LAB_DB.BRONZE.ORDERS_RAW    ──► stg_orders    ──► fact_orders
+                                                    │
+                                                    └── dim_customers (FK join)
 ```
 
 ## Limpieza (opcional)
