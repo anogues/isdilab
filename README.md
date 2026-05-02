@@ -293,6 +293,139 @@ DuckDB es una base de datos OLAP local que reemplaza a Snowflake sin coste algun
 
 El flujo es idéntico al de Snowflake (misma arquitectura medallion, mismos tests, misma salida). Solo cambia cómo se ingieren los datos y dos detalles de sintaxis SQL.
 
+## Opcional: Agregar `fact_orders` (star schema)
+
+Extiende el modelo analítico agregando una tabla de hechos de órdenes, formando un star schema con `dim_customers`.
+
+### 1. Crear el CSV de órdenes
+
+Guardar como `orders.csv`:
+
+```csv
+order_id,customer_id,order_date,total_amount,status
+101,1,2023-03-01,150.50,completed
+102,1,2023-04-15,200.00,completed
+103,2,2023-03-10,89.99,completed
+104,3,2023-05-01,320.00,cancelled
+105,3,2023-06-15,110.25,completed
+106,4,2023-04-01,450.00,completed
+107,5,2023-05-20,75.00,pending
+108,5,2023-07-01,199.99,completed
+109,6,2023-06-01,0.00,refunded
+110,1,2023-08-10,299.99,completed
+```
+
+### 2. Cargar a Snowflake (BRONZE)
+
+En Snowsight, dentro de `LAB_DB.BRONZE`, crear tabla `ORDERS_RAW` desde el CSV (mismo proceso que con `CUSTOMERS_RAW`).
+
+### 3. Registrar la fuente en `dbt/models/staging/sources.yml`
+
+Agregar dentro de `raw_customer_data`, después de `CUSTOMERS_RAW`:
+
+```yaml
+      - name: ORDERS_RAW
+        description: "Tabla bronza de órdenes cargada desde orders.csv."
+        columns:
+          - name: order_id
+            description: "Identificador único de la orden."
+            tests:
+              - not_null
+              - unique
+          - name: customer_id
+            description: "FK hacia CUSTOMERS_RAW."
+            tests:
+              - not_null
+```
+
+### 4. Crear `dbt/models/staging/stg_orders.sql`
+
+```sql
+with source as (
+    select
+        order_id::number as order_id,
+        customer_id::number as customer_id,
+        try_to_date(order_date::varchar, 'YYYY-MM-DD') as order_date,
+        try_cast(total_amount as decimal(10,2)) as total_amount,
+        lower(status) as status
+    from {{ source('raw_customer_data', 'ORDERS_RAW') }}
+)
+
+select
+    order_id,
+    customer_id,
+    order_date,
+    total_amount,
+    status
+from source
+where total_amount > 0
+```
+
+### 5. Crear `dbt/models/marts/fact_orders.sql`
+
+```sql
+{{ config(materialized='table', schema='GOLD') }}
+
+with orders as (
+    select order_id, customer_id, order_date, total_amount, status
+    from {{ ref('stg_orders') }}
+)
+
+select
+    order_id,
+    customer_id,
+    order_date,
+    total_amount,
+    status
+from orders
+```
+
+### 6. Agregar tests en `dbt/models/marts/schema.yml`
+
+Dentro del modelo `dim_customers`, agregar una nueva entrada para `fact_orders`:
+
+```yaml
+  - name: fact_orders
+    description: "Tabla de hechos de órdenes. Grain = una línea por orden."
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: order_date
+        tests:
+          - not_null
+      - name: total_amount
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["completed", "cancelled", "pending", "refunded"]
+```
+
+### 7. Ejecutar
+
+```bash
+dbt run
+dbt test
+```
+
+El pipeline final queda:
+
+```
+LAB_DB.BRONZE.CUSTOMERS_RAW ──► stg_customers ──► dim_customers
+                             ──► stg_orders    ──► fact_orders (join con dim_customers)
+```
+
 ## Limpieza (opcional)
 
 ### Snowflake
