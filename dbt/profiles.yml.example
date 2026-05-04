@@ -9,5 +9,5 @@ snowflake_lab_project:
       role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'DBT_LAB_WH') }}"
       database: "{{ env_var('SNOWFLAKE_DATABASE', 'LAB_DB') }}"
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'dbt_dev') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'DBT_DEV') }}"
       threads: 1

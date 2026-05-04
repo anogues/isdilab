@@ -159,7 +159,7 @@ Ejecuta esos comandos en Snowsight (rol `ACCOUNTADMIN`) y luego verifica:
 SELECT * FROM LAB_DB.BRONZE.CUSTOMERS_RAW;
 ```
 
-Debes ver 7 filas, cada una con `customer_id` único y `last_name` no vacío.
+Debes ver 6 filas, cada una con `customer_id` único y `last_name` no vacío.
 
 ### 5.3 Re-ejecuta y valida
 
@@ -219,10 +219,9 @@ Si prefieres dbt Core a dbt Cloud, tienes dos caminos:
 
 4. Verifica y ejecuta:
    ```bash
-   dbt debug
-   dbt deps
-   dbt build
-   dbt docs generate && dbt docs serve
+    dbt debug
+    dbt build
+    dbt docs generate && dbt docs serve
    ```
 
 > **Nota:** Debes ejecutar igualmente el script SQL de la Parte 1 en Snowflake y cargar el CSV siguiendo la Parte 2.
@@ -382,7 +381,7 @@ from orders
 
 ### 6. Agregar tests en `dbt/models/marts/schema.yml`
 
-Dentro del modelo `dim_customers`, agregar una nueva entrada para `fact_orders`:
+En el archivo `dbt/models/marts/schema.yml`, agrega una nueva entrada para el modelo `fact_orders` (al mismo nivel que `dim_customers`, no dentro de él):
 
 ```yaml
   - name: fact_orders
@@ -415,8 +414,7 @@ Dentro del modelo `dim_customers`, agregar una nueva entrada para `fact_orders`:
 ### 7. Ejecutar
 
 ```bash
-dbt run
-dbt test
+dbt build
 ```
 
 El pipeline final queda:
